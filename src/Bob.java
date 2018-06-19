@@ -26,6 +26,7 @@ import java.util.Scanner;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.xml.bind.DatatypeConverter;
 
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -133,13 +134,12 @@ public class Bob {
 	        System.out.println("Enviando certificado : ");
 	        toServer.writeObject(frame);
 
-	        System.out.println("Recebendo chave simetrica");
 
 	        while (in.hasNextLine()) {
 
+	        	System.out.println("Recebendo chave simetrica");
 	            final String recebido = in.nextLine();
-	            final byte [] received = recebido.getBytes();
-	            final String decifrar = new String(rsa.decrypt(received));
+	            final String decifrar = new String(aes.decrypt(Hex.decodeHex(recebido.toCharArray())));
 
 	            System.out.println("\nMensagem Recebida\n");
 	            System.out.println("\nTexto Plano\n");
@@ -149,7 +149,7 @@ public class Bob {
 
 	            final String mensagem = "Mensagem para o cliente";
 
-	            final char[] enviado = Hex.encodeHex(rsa.encrypt(mensagem.getBytes()));
+	            final char[] enviado = Hex.encodeHex(aes.encrypt(mensagem.getBytes()));
 
 	            System.out.println("\nMensagem Recebida\n");
 	            System.out.println("\nTexto Plano\n");

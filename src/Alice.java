@@ -1,10 +1,8 @@
-import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.InvalidAlgorithmParameterException;
@@ -105,7 +103,7 @@ public class Alice {
 	            ReaderWithInfo escrever = new ReaderWithInfo(new InputStreamReader(System.in));
 	            String msg = escrever.readLine("Digite msg: ");
 	            
-	            final char[] enviado = Hex.encodeHex(rsa.encrypt(msg.getBytes()));
+	            final char[] enviado = Hex.encodeHex(aes.encrypt(msg.getBytes()));
 	            
 	            System.out.println("\nMensagem codificada\n");
 	            System.out.println(Arrays.toString(enviado));
@@ -113,7 +111,7 @@ public class Alice {
 	            out.println(enviado);
 
 	            final String recebido = in.nextLine();
-	            final String descriptografado = new String(rsa.decrypt(Hex.decodeHex(recebido.toCharArray())));
+	            final String descriptografado = new String(aes.decrypt(Hex.decodeHex(recebido.toCharArray())));
 
 	            System.out.println("\nMensagem Recebida\n");
 	            System.out.println("\nMensagem texto plano\n");
@@ -147,7 +145,7 @@ public class Alice {
 	    private void enviarChaveSimetrica(final char[] chaveSimetrica) {
 	    	System.out.println("Chave simetrica : ");
 	        System.out.println(Arrays.toString(chaveSimetrica));
-	        out.println(Arrays.toString(chaveSimetrica));
+	        out.println(chaveSimetrica);
 	        System.out.println("Chave simetrica enviada");
 	    }
 
@@ -175,7 +173,7 @@ public class Alice {
 	        final char[] chavePublica = new String(rsa.getPublicKey().getEncoded()).toCharArray();
 	        final Key chave = ChaveDerivada(chavePublica);
 	        aes.setKey(chave);
-	        chaveSimetrica = Hex.encodeHex(rsa.encrypt(chave.getEncoded()));
+	        chaveSimetrica = Hex.encodeHex(aes.encrypt(chave.getEncoded()));
 	        enviarChaveSimetrica(chaveSimetrica);
 	    }
 }
