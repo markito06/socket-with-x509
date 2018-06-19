@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -125,28 +126,20 @@ public class Bob {
 	        in = new Scanner(cliente.getInputStream());
 	        out = new PrintStream(cliente.getOutputStream());
 
-	        /*
-	         * Encoding problem solution
-	         * */
-	        String certificate = new String(certificado.toString().getBytes(), "UTF-8");
-	        // final char[] certificate = Hex.encodeHex(certificado.getEncoded());
+	        
+	        ObjectOutputStream toServer = new ObjectOutputStream(cliente.getOutputStream());
+	        final byte [] frame = certificado.getEncoded();
 
 	        System.out.println("Enviando certificado : ");
-	        System.out.println(certificate);
-	        out.println(certificado);
+	        toServer.writeObject(frame);
 
 	        System.out.println("Recebendo chave simetrica");
 
-	        while (!in.hasNextLine()) {
+	        while (in.hasNextLine()) {
 
 	            final String recebido = in.nextLine();
-	            /*
-	             * Para resolver problema de codificação na conversão
-	             * @see  org.apache.commons.codec.DecoderException : Odd number of characters
-	             * **/
-	            final char[] utfCharReceived = new String(recebido.getBytes(), "UTF-8").toCharArray();
-	            
-	            final String decifrar = new String(aes.decrypt(Hex.decodeHex(utfCharReceived)));
+	            final byte [] received = recebido.getBytes();
+	            final String decifrar = new String(rsa.decrypt(received));
 
 	            System.out.println("\nMensagem Recebida\n");
 	            System.out.println("\nTexto Plano\n");
@@ -156,7 +149,7 @@ public class Bob {
 
 	            final String mensagem = "Mensagem para o cliente";
 
-	            final char[] enviado = Hex.encodeHex(aes.encrypt(mensagem.getBytes()));
+	            final char[] enviado = Hex.encodeHex(rsa.encrypt(mensagem.getBytes()));
 
 	            System.out.println("\nMensagem Recebida\n");
 	            System.out.println("\nTexto Plano\n");

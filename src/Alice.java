@@ -1,5 +1,8 @@
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.Socket;
@@ -85,7 +88,8 @@ public class Alice {
 	        return new SecretKeySpec(pbkdf2.generateSecret(new PBEKeySpec(password, salt, PBKDF2_ITERATIONS, DERIVED_KEY_LENGTH)).getEncoded(), "AES");
 	    }
 
-	    public void conectar(String ip) throws IOException, CertificateException, DecoderException, InvalidKeySpecException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+	    @SuppressWarnings("resource")
+		public void conectar(String ip) throws IOException, CertificateException, DecoderException, InvalidKeySpecException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 
 	        criadorSocket(ip);
 
@@ -98,26 +102,18 @@ public class Alice {
 	        chaves();
 
 	        do {
-	            String msg = "Mensagem para o servidor";
-	            System.out.println(msg);
-
-	            final char[] enviado = Hex.encodeHex(aes.encrypt(msg.getBytes()));
-
-	            System.out.println("Mensagem enviada");
-	            System.out.println("\nMensagem texto plano\n");
-	            System.out.print(msg);
+	            ReaderWithInfo escrever = new ReaderWithInfo(new InputStreamReader(System.in));
+	            String msg = escrever.readLine("Digite msg: ");
+	            
+	            final char[] enviado = Hex.encodeHex(rsa.encrypt(msg.getBytes()));
+	            
 	            System.out.println("\nMensagem codificada\n");
 	            System.out.println(Arrays.toString(enviado));
 
-	            out.println(Arrays.toString(enviado));
+	            out.println(enviado);
 
 	            final String recebido = in.nextLine();
-
-		        /*
-		         * Encoding problem solution
-		         * */
-		        String recebidoUtf = new String(recebido.getBytes(), "UTF-8");
-		        final String descriptografado = new String(aes.decrypt(Hex.decodeHex(recebidoUtf.toCharArray())));
+	            final String descriptografado = new String(rsa.decrypt(Hex.decodeHex(recebido.toCharArray())));
 
 	            System.out.println("\nMensagem Recebida\n");
 	            System.out.println("\nMensagem texto plano\n");
@@ -149,36 +145,28 @@ public class Alice {
 	    }
 
 	    private void enviarChaveSimetrica(final char[] chaveSimetrica) {
-	        //String chave = String.valueOf(chaveSimetrica);
+	    	System.out.println("Chave simetrica : ");
+	        System.out.println(Arrays.toString(chaveSimetrica));
 	        out.println(Arrays.toString(chaveSimetrica));
-	        System.out.println("Enviada chave simetrica");
+	        System.out.println("Chave simetrica enviada");
 	    }
 
-	    private void criarCertificado() throws CertificateException, DecoderException, UnsupportedEncodingException {
-	    	final StringBuffer certificateReceived = new StringBuffer();
-	    	
-	    	
-	    	
-	    	while (in.hasNextLine()) {
-	    		if(!in.hasNextLine()) {
-	    			in.close();
-	    		}
-	    		certificateReceived.append(in.nextLine());
+	    private void criarCertificado() throws CertificateException, DecoderException {
+	    	ObjectInputStream fromClient = null;
+	    	byte [] certificadoRecebido = null;
+	    	try {
+	    		 fromClient = new ObjectInputStream(server.getInputStream());
+	    		 certificadoRecebido = (byte[]) fromClient.readObject();
 				
+			} catch (Exception e) {
+				  System.out.println("Falha ao receber certificado");
+				  throw new  CertificateException (e);
 			}
-	    		    	
-    	
 	    	
-	    	final String certificate = certificateReceived.toString();
+	    	
 	        System.out.println("Enviando certificado");
-	        
-	        String certificadoRecebido = new String(certificate.getBytes(), "UTF-8");
-	        char[] utfCharCertificate = certificadoRecebido.toCharArray();
-	        
-	        byte [] buffer = Hex.decodeHex(utfCharCertificate);
-	        ByteArrayInputStream stream = new ByteArrayInputStream(buffer);
 	             
-	        final Certificate cert = CertificateFactory.getInstance("X.509").generateCertificate(stream);
+	        final Certificate cert = CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(certificadoRecebido));
 	        rsa.setPublicKey(cert.getPublicKey());
 	    }
 
