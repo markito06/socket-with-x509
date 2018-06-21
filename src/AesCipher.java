@@ -11,7 +11,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 
-public class CifradorAES {
+public class AesCipher {
 
 	private static final int IV_LENGTH = 16;
 
@@ -20,7 +20,7 @@ public class CifradorAES {
 
 	private Key key;
 
-	public CifradorAES(final SecureRandom random) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException {
+	public AesCipher(final SecureRandom random) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException {
 		random.nextBytes(iv);
 		cipher = Cipher.getInstance("AES/GCM/NoPadding", "BCFIPS");
 	}

@@ -1,6 +1,4 @@
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
@@ -9,6 +7,7 @@ import java.net.Socket;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStoreException;
@@ -16,177 +15,187 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.Security;
 import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import javax.xml.bind.DatatypeConverter;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.bouncycastle.crypto.CryptoServicesRegistrar;
-import org.bouncycastle.crypto.fips.FipsDRBG;
-import org.bouncycastle.crypto.util.BasicEntropySourceProvider;
-import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 
+public class Bob extends SecurityServer {
 
+	Logger logger = Logger.getLogger(Bob.class.getName());
 
-public class Bob {
+	private final ServerSocket bob;
+	private Socket alice;
+	private PrintStream out;
+	private Scanner in;
+	private Key sessionKey;
 
-	  static {
-	        Security.addProvider(new BouncyCastleFipsProvider());
-	        CryptoServicesRegistrar.setSecureRandom(FipsDRBG.SHA512_HMAC.fromEntropySource(new BasicEntropySourceProvider(new SecureRandom(), true)).build(null, false));
-	    }
+	public static void startServer(String ipServer, String port)
+			throws IOException, DecoderException, OperatorCreationException, GeneralSecurityException {
+		final Bob bob = new Bob(Integer.valueOf(port), ipServer);
+		bob.hear();
+		bob.shutdown();
+	}
 
-	    public static void startServer(String ipServer, String porta) throws IOException, DecoderException, OperatorCreationException, GeneralSecurityException {
-	        final Bob servidor = new Bob(Integer.valueOf(porta), ipServer);
-	        servidor.ouvir();
-	        servidor.desligar();
-	    }
-	    private final GerenciadorCertificados gerenciadorCertificados;
+	private Bob(final int porta, final String ipServer) throws NoSuchAlgorithmException, NoSuchProviderException,
+			NoSuchPaddingException, IOException, OperatorCreationException, GeneralSecurityException {
+		super();
 
-	    private final CifradorAES aes;
-	    private final CifradorRSA rsa;
+		PublicKey publicKey = null;
+		PrivateKey privateKey = null;
 
-	    private final ServerSocket servidor;
+		certificate = certificateManager.getCertificate();
+		privateKey = certificateManager.getPrivateKey();
 
-	    private X509Certificate certificado;
+		if (certificate == null || privateKey == null) {
+			logger.info("Certificate not found");
+			logger.info("Generate new cetificate");
 
-	    private Socket cliente;
-	    private PrintStream out;
-	    private Scanner in;
-	    private String HOME_FOLDER;
-	    private String FILE_NAME;
+			final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", "BCFIPS");
 
-	    private Bob(final int porta,  final String ipServer) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, IOException, OperatorCreationException, GeneralSecurityException {
+			final KeyPair keyParCa = keyPairGenerator.generateKeyPair();
+			final KeyPair keyPar = keyPairGenerator.generateKeyPair();
 
-	    	this.config();
-	        final SecureRandom random = new FixedRandom();
+			certificate = CertificateUtils.CertificadoAssinado(keyPar.getPublic(), keyParCa.getPrivate(),
+					keyParCa.getPublic(), getCommonName());
 
-	        aes = new CifradorAES(random);
-	        rsa = new CifradorRSA(random);
+			publicKey = certificate.getPublicKey();
+			privateKey = keyPar.getPrivate();
 
-	        ReaderWithInfo ler = new ReaderWithInfo(new InputStreamReader(System.in));
-
-	        gerenciadorCertificados = new GerenciadorCertificados(
-	                new File(HOME_FOLDER + File.separator + FILE_NAME), ler.readLine("Digite senha CA: "), ler.readLine("Digite sua senha: "));
-
-	        PublicKey chavePublica = null;
-	        PrivateKey chavePrivada = null;
-
-	        certificado = gerenciadorCertificados.getCertificate();
-	        chavePrivada = gerenciadorCertificados.getPrivateKey();
-
-	        if (certificado == null || chavePrivada == null) {
-	            System.out.println("Arquivo de certificado não criado");
-	            System.out.println("Gerando um novo certificado");
-
-	            final KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", "BCFIPS");
-
-	            final KeyPair parDeChavesAC = keyPairGenerator.generateKeyPair();
-	            final KeyPair parDeChaves = keyPairGenerator.generateKeyPair();
-
-	            certificado = UtilitariosCertificado.CertificadoAssinado(parDeChaves.getPublic(), parDeChavesAC.getPrivate(), parDeChavesAC.getPublic());
-
-	            chavePublica = certificado.getPublicKey();
-	            chavePrivada = parDeChaves.getPrivate();
-
-	            gerenciadorCertificados.setCertificate(certificado);
-	            gerenciadorCertificados.setPrivateKey(chavePrivada, certificado);
-	        }
-
-	        chavePublica = certificado.getPublicKey();
-	        rsa.setPublicKey(chavePublica);
-	        rsa.setPrivateKey(chavePrivada);
-
-	        InetAddress addr = InetAddress.getByName(ipServer);
-	        final int defaultMaxConnections = 50;
-	        servidor = new ServerSocket(porta,defaultMaxConnections, addr);
-
-	    }
-
-	    private void config() {
-	    	HOME_FOLDER = System.getProperty("user.home");
-	    	FILE_NAME = "myCert.jks";
+			certificateManager.setCertificate(certificate);
+			certificateManager.setPrivateKey(privateKey, certificate);
 		}
 
-		private void ouvir() throws IOException, DecoderException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException,
-	            KeyStoreException, NoSuchAlgorithmException, CertificateException {
+		publicKey = certificate.getPublicKey();
+		rsa.setPublicKey(publicKey);
+		rsa.setPrivateKey(privateKey);
 
-	        System.out.println("Aguardando conexao");
-	        cliente = servidor.accept();
-	        System.out.println("Cliente conectado");
+		InetAddress addr = InetAddress.getByName(ipServer);
+		final int defaultMaxConnections = 50;
+		bob = new ServerSocket(porta, defaultMaxConnections, addr);
 
-	        in = new Scanner(cliente.getInputStream());
-	        out = new PrintStream(cliente.getOutputStream());
+	}
 
-	        
-	        ObjectOutputStream toServer = new ObjectOutputStream(cliente.getOutputStream());
-	        final byte [] frame = certificado.getEncoded();
+	private void hear()
+			throws IOException, DecoderException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException,
+			InvalidAlgorithmParameterException, KeyStoreException, NoSuchAlgorithmException, CertificateException {
 
-	        System.out.println("Enviando certificado : ");
-	        toServer.writeObject(frame);
+		logger.info("Waiting for connection");
+		alice = bob.accept();
+		logger.info("Alice connected");
+
+		in = new Scanner(alice.getInputStream());
+		out = new PrintStream(alice.getOutputStream());
+
+		ObjectOutputStream toServer = new ObjectOutputStream(alice.getOutputStream());
+		final byte[] x509Encoded = certificate.getEncoded();
+
+		logger.info("Send certificate: ");
+		toServer.writeObject(x509Encoded);
+
+		this.establishSession();
+
+		while (in.hasNextLine()) {
 
 
-	        while (in.hasNextLine()) {
+			String encriptedMsg = in.nextLine();
+			logger.info("Encrypted message received : " + encriptedMsg);
 
-	        	System.out.println("Recebendo chave simetrica");
-	            final String recebido = in.nextLine();
-	            final String decifrar = new String(aes.decrypt(Hex.decodeHex(recebido.toCharArray())));
+			String decriptedMsg = new String(aes.decrypt(Hex.decodeHex(encriptedMsg.toCharArray())));
+			logger.info("Decrypted message : " + decriptedMsg);
 
-	            System.out.println("\nMensagem Recebida\n");
-	            System.out.println("\nTexto Plano\n");
-	            System.out.println(decifrar);
-	            System.out.println("\nMensagem Codificada\n");
-	            System.out.println(recebido);
+		}
 
-	            final String mensagem = "Mensagem para o cliente";
+	}
 
-	            final char[] enviado = Hex.encodeHex(aes.encrypt(mensagem.getBytes()));
+	private void establishSession() throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException,
+			InvalidAlgorithmParameterException, DecoderException {
+		final String encryptedSessionKey = in.nextLine();
+		logger.info("Encrypted session key from Alice:\n " + encryptedSessionKey);
+		byte[] k = rsa.decrypt(Hex.decodeHex(encryptedSessionKey.toCharArray()));
 
-	            System.out.println("\nMensagem Recebida\n");
-	            System.out.println("\nTexto Plano\n");
-	            System.out.println(mensagem);
-	            System.out.println("\nMensagem Codificada\n");
-	            System.out.println(String.valueOf(enviado));
+		if (k == null || k.length == 0) {
+			throw new InvalidKeyException("Session key is invalid!");
+		}
 
-	            out.println(Arrays.toString(enviado));
+		sessionKey = new SecretKeySpec(k, "AES");
+		if (sessionKey == null) {
+			throw new InvalidKeyException("Session key is invalid!");
+		}
+		
+		aes.setKey(sessionKey);
+		logger.info("Decrypted session key : \n" + sessionKey);
+		logger.info("Established session!");
+	}
 
-	            System.out.println("Aguardando resposta do cliente");
+	private void shutdown() throws IOException {
 
-	        }
+		bob.close();
 
-	    }
+		try {
+			if (alice != null) {
+				alice.close();
+			}
+			if (in != null) {
+				throw new InException();
+			}
+			if (out != null) {
+				throw new OutException();
+			}
 
-	    private void desligar() throws IOException {
+		} catch (InException e) {
+			in.close();
+			logger.log(Level.SEVERE, "No in", e);
+		} catch (OutException e) {
+			out.close();
+			logger.log(Level.SEVERE, "No out", e);
+		}
 
-	        servidor.close();
+	}
 
-	        try {
-	            if (cliente != null) {
-	                cliente.close();
-	            }
-	            if (in != null) {
-	                throw new InException();
-	            }
-	            if (out != null) {
-	                throw new OutException();
-	            }
+	@Override
+	public String getHomeFolder() {
+		return System.getProperty("user.home");
+	}
 
-	        } catch (InException e) {
-	            in.close();
-	            System.out.println("Sem entrada");
-	        } catch (OutException e) {
-	            out.close();
-	            System.out.println("Sem saida");
-	        }
+	@Override
+	public String getFileName() {
+		return "myCert.jks";
+	}
 
-	    }
+	@Override
+	public String getPassCa() throws IOException {
+		return super.lerTerminal.readLine("Enter CA password: ");
+	}
+
+	@Override
+	public String getPassCert() throws IOException {
+		return super.lerTerminal.readLine("Enter your password: ");
+	}
+
+	@Override
+	public String fillSecondStep() throws IOException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public String getCommonName() throws IOException {
+		return super.lerTerminal.readLine("Enter bob common name:  \n");
+	}
+
+	@Override
+	public String getAliceNonce() throws Exception {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

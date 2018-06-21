@@ -2,10 +2,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
 
-public class ReaderWithInfo extends BufferedReader{
+public class LeitorTerminal extends BufferedReader{
 
 	private static final String LINE_BREAK = "\n";	
-	public ReaderWithInfo(Reader reader) {
+	public LeitorTerminal(Reader reader) {
 		super(reader);
 	}
 	

@@ -21,7 +21,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
-public class UtilitariosCertificado {
+public class CertificateUtils {
 
 	private static final long ONE_YEAR = 1000L * 60 * 60 * 24 * 365;
 	private static final String AUTORIDADE_CERTIFICADORA_MARCOS = "CN=Marcos emissor AC";
@@ -40,14 +40,14 @@ public class UtilitariosCertificado {
 		return new JcaX509CertificateConverter().setProvider("BCFIPS").getCertificate(builderCertificadov1.build(signerBuilder.build(caSignerKey)));
 	}
 
-	private static X509Certificate CertificadoV3(final X509Certificate certificadoAC, final PrivateKey chavePrivadaAC, final PublicKey chavePublica)
+	private static X509Certificate CertificadoV3(final X509Certificate certificadoAC, final PrivateKey chavePrivadaAC, final PublicKey chavePublica, final String commonName)
 		throws GeneralSecurityException, CertIOException, OperatorCreationException {
 		final X509v3CertificateBuilder builderCertificadov3 = new JcaX509v3CertificateBuilder(
 			certificadoAC.getSubjectX500Principal(),
 			BigInteger.valueOf(System.currentTimeMillis()).multiply(BigInteger.valueOf(100)),
 			new Date(System.currentTimeMillis() - 1000L * 5),
 			new Date(System.currentTimeMillis() + ONE_YEAR),
-			new X500Principal("CN=Exemplo Certificado V3"), chavePublica);
+			new X500Principal("CN=" + commonName), chavePublica);
 
 		final JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
 		builderCertificadov3.addExtension(Extension.subjectKeyIdentifier, Boolean.FALSE, extUtils.createSubjectKeyIdentifier(chavePublica));
@@ -68,9 +68,9 @@ public class UtilitariosCertificado {
      * @throws GeneralSecurityException
      * @throws IOException
      */
-    public static X509Certificate CertificadoAssinado(final PublicKey chavePublica, final PrivateKey chavePrivadaAC, final PublicKey chavePublicaAC)
+    public static X509Certificate CertificadoAssinado(final PublicKey chavePublica, final PrivateKey chavePrivadaAC, final PublicKey chavePublicaAC, final String commonName)
 		throws OperatorCreationException, GeneralSecurityException, IOException {
 		final X509Certificate certificadoAC = CertificadoV1(chavePrivadaAC, chavePublicaAC);
-		return CertificadoV3(certificadoAC, chavePrivadaAC, chavePublica);
+		return CertificadoV3(certificadoAC, chavePrivadaAC, chavePublica, commonName);
 	}
 }

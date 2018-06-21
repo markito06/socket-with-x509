@@ -13,7 +13,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 
-public class GerenciadorCertificados {
+public class CertificateManager {
 
 	private final File arquivo;
 
@@ -21,7 +21,7 @@ public class GerenciadorCertificados {
 	private final String password;
 	private final String passwordChavePrivada;
 
-	public GerenciadorCertificados(final File arquivo, final String password, final String cpPassword)
+	public CertificateManager(final File arquivo, final String password, final String cpPassword)
 		throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException, NoSuchProviderException {
 		
                 keyStore = KeyStore.getInstance("JKS");
